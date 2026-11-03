@@ -21,6 +21,7 @@
   <link rel="stylesheet" href="./src/css/components/forms-modals-and-buttons.css" />
   <link rel="stylesheet" href="./src/css/modules/pos-terminal-and-modules.css" />
   <link rel="stylesheet" href="./src/css/modules/auth-connections-ldap-radius.css" />
+  <link rel="stylesheet" href="./src/css/modules/login-and-authentication-gate.css" />
 
   <!-- Import Map Estándar para ejecutar SDK de Firebase sin bloqueos de Analytics -->
   <script type="importmap">
@@ -120,6 +121,15 @@
           />
           <span id="header-active-ad-user">CORP\dbaezh</span>
         </div>
+
+        <button
+          type="button"
+          id="btn-header-logout"
+          class="telemetry-logout-btn"
+          title="Cerrar sesión actual y volver al Control de Acceso Web"
+        >
+          <span>Salir</span>
+        </button>
       </div>
     </header>
 
@@ -201,6 +211,9 @@
       </div>
     </footer>
   </div>
+
+  <!-- Control de Entrada y Pantalla de Login Web -->
+  <div id="erp-login-auth-gate" class="erp-login-auth-gate is-hidden"></div>
 
   <!-- Contenedor de Alertas y Auditoría -->
   <div id="erp-global-toast-container" class="erp-toast-container" aria-live="polite"></div>

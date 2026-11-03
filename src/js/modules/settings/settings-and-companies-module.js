@@ -51,6 +51,7 @@ import {
   createOrUpdatePermissionGroup,
   assignPermissionGroupToUser,
   registerFetchedAdOrRadiusUserWithPermissions,
+  updateUserLocalCredentials,
   countEnabledModulesInGroup
 } from "../../security/modular-permissions-and-departments-service.js";
 import {
@@ -92,6 +93,10 @@ export const SettingsAndCompaniesModule = {
       window.__EDA_TARGET_SETTINGS_SUBVIEW = null;
     } else if (window.__EDA_TARGET_SETTINGS_SUBVIEW === "SOBRE_ABOUT") {
       activeRibbonItem = "SOBRE_ABOUT";
+      collapsedRibbonGroups.delete("GRP_SISTEMA_DBASE");
+      window.__EDA_TARGET_SETTINGS_SUBVIEW = null;
+    } else if (window.__EDA_TARGET_SETTINGS_SUBVIEW === "OPCIONES_SISTEMA") {
+      activeRibbonItem = "OPCIONES_SISTEMA";
       collapsedRibbonGroups.delete("GRP_SISTEMA_DBASE");
       window.__EDA_TARGET_SETTINGS_SUBVIEW = null;
     }
@@ -215,7 +220,8 @@ export const SettingsAndCompaniesModule = {
         groupId: "GRP_SISTEMA_DBASE",
         groupTitle: "Sistema dBase",
         items: [
-          { id: "SOBRE_ABOUT", label: "Sobre / About", badge: "VER" }
+          { id: "SOBRE_ABOUT", label: "Sobre / About", badge: "VER" },
+          { id: "OPCIONES_SISTEMA", label: "Opciones del sistema", badge: "OPT" }
         ]
       }
     ];
@@ -395,10 +401,6 @@ export const SettingsAndCompaniesModule = {
             >
               ${M365_HAMBURGER_TOGGLE_SVG}
             </button>
-            <label class="m365-autohide-label" title="Ocultar automáticamente el menú mostrando solo los iconos al elegir una sección">
-              <input type="checkbox" id="chk-cinta-rail-autohide" class="m365-autohide-checkbox" ${isCintaAutoHide ? "checked" : ""} />
-              <span>Ocultar auto.</span>
-            </label>
           </div>
           ${RIBBON_GROUPS_DEFINITION.map((grp) => {
             const isCollapsed = collapsedRibbonGroups.has(grp.groupId);
@@ -2138,6 +2140,129 @@ export const SettingsAndCompaniesModule = {
           `;
         }
 
+        // ====================================================================
+        // 12.1 SISTEMA DBASE: OPCIONES DEL SISTEMA (AUTO-OCULTAR, CONTRASEÑAS LOCALES Y SERVICIO)
+        // ====================================================================
+        if (activeRibbonItem === "OPCIONES_SISTEMA") {
+          const isSidebarAutoHide = localStorage.getItem("EDA_SIDEBAR_AUTOHIDE_V1") !== "false";
+          const isCintaAutoHide = localStorage.getItem("EDA_CINTA_RAIL_AUTOHIDE_V1") === "true";
+          return `
+            <div class="workspace-split-layout">
+              <div class="enterprise-panel">
+                <div class="enterprise-panel-header">
+                  <h3 class="enterprise-panel-title">Opciones del Sistema — Preferencias y Comportamiento</h3>
+                  <span class="badge-pill badge-info">Sistema dBase</span>
+                </div>
+                <div class="enterprise-panel-body">
+                  <div class="search-content-inspector">
+                    <h4 class="enterprise-panel-title">1. Comportamiento de Navegación (Estilo Microsoft 365)</h4>
+                    <p class="module-description">
+                      Configure cómo se comportan los paneles de módulos y menús al trabajar en la plataforma.
+                    </p>
+
+                    <div class="form-grid-layout">
+                      <div class="form-field-group">
+                        <label class="protocol-checkbox-label">
+                          <input type="checkbox" id="chk-opt-sidebar-autohide" class="protocol-checkbox-input" ${isSidebarAutoHide ? "checked" : ""} />
+                          <span><strong>Ocultar automáticamente el menú de módulos a la izquierda (solo iconos)</strong></span>
+                        </label>
+                        <span class="module-description">Al seleccionar un módulo o interactuar con el área de trabajo, el panel se contrae a 56px dejando solo la columna de iconos con indicador vertical azul.</span>
+                      </div>
+
+                      <div class="form-field-group">
+                        <label class="protocol-checkbox-label">
+                          <input type="checkbox" id="chk-opt-cinta-autohide" class="protocol-checkbox-input" ${isCintaAutoHide ? "checked" : ""} />
+                          <span><strong>Ocultar automáticamente la cinta vertical de configuración a iconos</strong></span>
+                        </label>
+                        <span class="module-description">La cinta vertical de opciones se contrae automáticamente a 56px mostrando solo iconos al elegir una subvista.</span>
+                      </div>
+                    </div>
+
+                    <hr class="module-header-banner" />
+
+                    <h4 class="enterprise-panel-title">2. Autenticación Web y Respaldo Local (Offline Contingency)</h4>
+                    <p class="module-description">
+                      Cuando la plataforma se ejecute desde la web pública o en la nube sin alcance al controlador de dominio Windows Server (172.16.4.2), los usuarios registrados podrán autenticarse con su contraseña local sincronizada.
+                    </p>
+
+                    <div class="inspector-field-grid">
+                      <div class="inspector-field-item">
+                        <span class="inspector-field-label">Control de Entrada Web</span>
+                        <span class="inspector-field-value"><strong>Pantalla de Login Obligatoria Activa</strong></span>
+                      </div>
+                      <div class="inspector-field-item">
+                        <span class="inspector-field-label">Respaldo Local por Usuario</span>
+                        <span class="inspector-field-value font-mono col-debit"><strong>Sincronizado con Correo y Contraseña</strong></span>
+                      </div>
+                      <div class="inspector-field-item">
+                        <span class="inspector-field-label">Empresas con Windows Server</span>
+                        <span class="inspector-field-value">${allCompanies.filter(c => getAuthConnectionConfigurations(c.id).windowsConnectorEnabled).length} Sociedades Habilitadas</span>
+                      </div>
+                      <div class="inspector-field-item">
+                        <span class="inspector-field-label">Usuarios con Respaldo Web</span>
+                        <span class="inspector-field-value">${allAdUsers.length} Cuentas Listas para Acceso Web</span>
+                      </div>
+                    </div>
+
+                    <hr class="module-header-banner" />
+
+                    <h4 class="enterprise-panel-title">3. Estado del Servicio de Windows en esta Máquina</h4>
+                    <div class="module-toolbar-actions">
+                      <button type="button" id="btn-opt-test-service" class="btn-action btn-primary btn-xs">
+                        Probar Servicio Windows (Gateway)
+                      </button>
+                      <button type="button" class="btn-action btn-secondary btn-xs" data-go-ribbon="SERVICIO_WINDOWS">
+                        Ver Comandos del Servicio
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Lista de Usuarios y Contraseñas Locales de Respaldo -->
+              <div class="enterprise-panel">
+                <div class="enterprise-panel-header">
+                  <h3 class="enterprise-panel-title">Usuarios y Credenciales de Respaldo Web (${allAdUsers.length})</h3>
+                  <span class="badge-pill badge-success">Acceso Web Seguro</span>
+                </div>
+                <div class="enterprise-panel-body">
+                  <p class="module-description">
+                    Cada usuario traído desde LDAP, RADIUS o creado manualmente posee una contraseña local vinculada a su correo corporativo para garantizar el acceso desde la web si el dominio está fuera.
+                  </p>
+                  <div class="table-scroll-container">
+                    <table class="accounting-table">
+                      <thead>
+                        <tr>
+                          <th>Usuario Dominio</th>
+                          <th>Correo Vinculado</th>
+                          <th>Contraseña Local Respaldo</th>
+                          <th>Acción</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        ${allAdUsers.map((u) => `
+                          <tr>
+                            <td class="font-mono"><strong>${sanitizeTextString(u.username)}</strong></td>
+                            <td class="font-mono">${sanitizeTextString(u.email || "-")}</td>
+                            <td class="font-mono">
+                              <span class="badge-pill badge-info">●●●●●●●●</span>
+                            </td>
+                            <td>
+                              <button type="button" class="btn-action btn-secondary btn-xs btn-edit-user-local-pass" data-user-id="${sanitizeTextString(u.id)}" data-username="${sanitizeTextString(u.username)}" data-email="${sanitizeTextString(u.email || "")}">
+                                Modificar Contraseña
+                              </button>
+                            </td>
+                          </tr>
+                        `).join("")}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            </div>
+          `;
+        }
+
         // 13. EMPRESAS: SELECTOR SAP LOGON 800 (POR DEFECTO EN EMPRESAS)
         return `
           <div class="sap-logon-window">
@@ -3404,6 +3529,79 @@ export const SettingsAndCompaniesModule = {
           activateCompanySession(companyRecord);
         });
       }
+
+      // ====================================================================
+      // EVENTOS DE OPCIONES DEL SISTEMA (PREFERENCIAS, CONTRASEÑAS LOCALES Y SERVICIO)
+      // ====================================================================
+      containerEl.querySelector("#chk-opt-sidebar-autohide")?.addEventListener("change", (e) => {
+        const val = Boolean(e.target.checked);
+        localStorage.setItem("EDA_SIDEBAR_AUTOHIDE_V1", val ? "true" : "false");
+        dispatchEnterpriseToast({
+          title: val ? "Auto-ocultar menú principal activado" : "Auto-ocultar menú principal desactivado",
+          message: val ? "El menú lateral se contraerá automáticamente a la izquierda al navegar." : "El menú lateral permanecerá expandido.",
+          variant: "info"
+        });
+      });
+
+      containerEl.querySelector("#chk-opt-cinta-autohide")?.addEventListener("change", (e) => {
+        isCintaAutoHide = Boolean(e.target.checked);
+        localStorage.setItem("EDA_CINTA_RAIL_AUTOHIDE_V1", isCintaAutoHide ? "true" : "false");
+        dispatchEnterpriseToast({
+          title: isCintaAutoHide ? "Auto-ocultar cinta activado" : "Auto-ocultar cinta desactivado",
+          message: isCintaAutoHide ? "La cinta vertical se contraerá a solo iconos tras elegir una opción." : "La cinta vertical permanecerá expandida.",
+          variant: "info"
+        });
+      });
+
+      containerEl.querySelector("#btn-opt-test-service")?.addEventListener("click", async () => {
+        const status = await checkGatewayServiceStatus();
+        if (status.isOnline) {
+          dispatchEnterpriseToast({
+            title: "Servicio Windows Gateway Online ✓",
+            message: `El servicio de autenticación autónomo responde en http://127.0.0.1:3890 (PID: ${status.pid || "Daemon"}).`,
+            variant: "success"
+          });
+        } else {
+          dispatchEnterpriseToast({
+            title: "Servicio Windows Gateway Fuera de Línea",
+            message: "No se pudo conectar a http://127.0.0.1:3890. El sistema utilizará autenticación con contraseñas locales de respaldo.",
+            variant: "warning"
+          });
+        }
+      });
+
+      containerEl.querySelectorAll(".btn-edit-user-local-pass").forEach((btn) => {
+        btn.addEventListener("click", async () => {
+          const userId = btn.getAttribute("data-user-id");
+          const username = btn.getAttribute("data-username");
+          const currentEmail = btn.getAttribute("data-email");
+          const newEmail = window.prompt(`Correo corporativo para el usuario ${username}:`, currentEmail || `${username.split("\\").pop()}@empresa.com`);
+          if (newEmail === null) return;
+          const newPass = window.prompt(`Nueva contraseña local de respaldo web para ${username} (mínimo 6 caracteres):`, "laantillana2026*");
+          if (newPass === null) return;
+          if (newPass.length < 6) {
+            dispatchEnterpriseToast({
+              title: "Contraseña muy corta",
+              message: "La contraseña local debe tener al menos 6 caracteres.",
+              variant: "warning"
+            });
+            return;
+          }
+          const updated = await updateUserLocalCredentials({
+            userId,
+            email: newEmail.trim(),
+            localPassword: newPass
+          });
+          if (updated) {
+            dispatchEnterpriseToast({
+              title: "Credenciales de Respaldo Actualizadas",
+              message: `El usuario ${username} ahora puede acceder offline y vía web con su contraseña local asignada.`,
+              variant: "success"
+            });
+            renderContent();
+          }
+        });
+      });
     };
 
     renderContent();

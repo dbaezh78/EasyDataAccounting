@@ -1,7 +1,7 @@
 {
-  "name": "easy-data-accounting",
+  "name": "adbase",
   "version": "1.0.0",
-  "description": "Sistema ERP y Contabilidad Empresarial Modular de Alto Rendimiento (Superior a SAP) con Integración Windows Server AD y Firebase",
+  "description": "Contabilidad dBase - Accounting dBase (Base de datos para Contabilidad) con Integración Windows Server AD, RADIUS NPS y Web Login Gate",
   "main": "index.html",
   "type": "module",
   "scripts": {
@@ -15,17 +15,18 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/dbaezh78/EasyDataAccounting.git"
+    "url": "git+https://github.com/dbaezh78/adBase.git"
   },
   "keywords": [
+    "adbase",
+    "accounting-dbase",
+    "contabilidad-dbase",
     "erp",
     "accounting",
     "contabilidad",
     "modular",
-    "firebase",
     "windows-active-directory",
-    "pos",
-    "payroll"
+    "radius-nps"
   ],
   "license": "PROPRIETARY",
   "dependencies": {

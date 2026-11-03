@@ -27,6 +27,8 @@ import {
 } from "../search/search-content-populator.js";
 import { executeUniversalSearch } from "../search/universal-search-engine.js";
 import { dispatchEnterpriseToast } from "./ui-notification-dispatcher.js";
+import { LoginGateManager } from "./application-login-gate-manager.js";
+import { switchActiveUserSecuritySession } from "../security/role-permission-evaluator.js";
 
 // Importación de los 13 Módulos Independientes
 import { SettingsAndCompaniesModule } from "../modules/settings/settings-and-companies-module.js";
@@ -92,10 +94,6 @@ function renderSidebarNavigationMenu() {
       >
         ${M365_HAMBURGER_TOGGLE_SVG}
       </button>
-      <label class="m365-autohide-label" title="Marcar para ocultar automáticamente a la izquierda (solo iconos) al cambiar de módulo o de ventana">
-        <input type="checkbox" id="chk-m365-sidebar-autohide" ${autoHideEnabled ? "checked" : ""} />
-        <span>Ocultar auto.</span>
-      </label>
     </div>
   `;
 
@@ -122,7 +120,7 @@ function renderSidebarNavigationMenu() {
     `;
   });
 
-  // Sección contraíble "Sistema dBase" con el módulo "Sobre / About"
+  // Sección contraíble "Sistema dBase" con los módulos "Sobre / About" y "Opciones del sistema"
   html += `
     <div class="sidebar-section-group is-collapsed" data-sidebar-category="SISTEMA DBASE">
       <button type="button" class="sidebar-section-title" data-toggle-sidebar-cat="SISTEMA DBASE" title="Click para expandir Sistema dBase">
@@ -137,6 +135,13 @@ function renderSidebarNavigationMenu() {
           </span>
           <span class="sidebar-tcode-badge">VER</span>
         </button>
+        <button type="button" id="btn-sidebar-open-opciones-sistema" class="sidebar-module-btn" title="Opciones del sistema — Preferencias de auto-ocultar, credenciales de respaldo y servicio">
+          <span class="sidebar-module-label-group">
+            <span class="m365-nav-icon-box">${getMicrosoft365NavIconSvg("opciones-sistema")}</span>
+            <span class="sidebar-module-text">Opciones del sistema</span>
+          </span>
+          <span class="sidebar-tcode-badge">OPT</span>
+        </button>
       </div>
     </div>
   `;
@@ -147,18 +152,6 @@ function renderSidebarNavigationMenu() {
   if (toggleRailBtn) {
     toggleRailBtn.addEventListener("click", () => {
       sidebarEl.classList.toggle("is-rail-collapsed");
-    });
-  }
-
-  const autoHideChk = sidebarEl.querySelector("#chk-m365-sidebar-autohide");
-  if (autoHideChk) {
-    autoHideChk.addEventListener("change", (e) => {
-      autoHideEnabled = Boolean(e.target.checked);
-      try {
-        localStorage.setItem(SIDEBAR_AUTOHIDE_STORAGE_KEY, String(autoHideEnabled));
-      } catch (_err) {
-        // Ignorar
-      }
     });
   }
 
@@ -207,6 +200,17 @@ function renderSidebarNavigationMenu() {
   if (sobreAboutSidebarBtn) {
     sobreAboutSidebarBtn.addEventListener("click", async () => {
       window.__EDA_TARGET_SETTINGS_SUBVIEW = "SOBRE_ABOUT";
+      await mountAndRenderIndependentModule("settings");
+      if (autoHideEnabled) {
+        sidebarEl.classList.add("is-rail-collapsed");
+      }
+    });
+  }
+
+  const opcionesSidebarBtn = sidebarEl.querySelector("#btn-sidebar-open-opciones-sistema");
+  if (opcionesSidebarBtn) {
+    opcionesSidebarBtn.addEventListener("click", async () => {
+      window.__EDA_TARGET_SETTINGS_SUBVIEW = "OPCIONES_SISTEMA";
       await mountAndRenderIndependentModule("settings");
       if (autoHideEnabled) {
         sidebarEl.classList.add("is-rail-collapsed");
@@ -289,6 +293,7 @@ function bindGlobalOmniboxSearchEvents() {
 function bindHeaderQuickSettingsButtons() {
   const companyBtn = document.getElementById("btn-header-open-company-selector");
   const themeBtn = document.getElementById("btn-header-open-settings");
+  const logoutBtn = document.getElementById("btn-header-logout");
 
   if (companyBtn) {
     companyBtn.addEventListener("click", async () => {
@@ -300,6 +305,13 @@ function bindHeaderQuickSettingsButtons() {
     themeBtn.addEventListener("click", async () => {
       window.__EDA_TARGET_SETTINGS_SUBVIEW = "TEMA_COLORES";
       await mountAndRenderIndependentModule("settings");
+    });
+  }
+  if (logoutBtn) {
+    logoutBtn.addEventListener("click", () => {
+      LoginGateManager.logout(() => {
+        window.location.reload();
+      });
     });
   }
 }
@@ -337,6 +349,24 @@ async function bootstrapEasyDataAccountingSystem() {
   renderSidebarNavigationMenu();
   bindGlobalOmniboxSearchEvents();
   bindHeaderQuickSettingsButtons();
+
+  // 6.1 Control de Acceso Web y Pantalla de Login Gate
+  LoginGateManager.init(async (session) => {
+    if (session?.user) {
+      switchActiveUserSecuritySession(session.user);
+    }
+    if (session?.company) {
+      const liveCompanyEl = document.getElementById("header-active-company-label");
+      if (liveCompanyEl) {
+        liveCompanyEl.textContent = `${session.company.nombreComercial} (${session.company.rnc})`;
+      }
+      const liveLogoEl = document.getElementById("header-active-company-logo");
+      if (liveLogoEl) {
+        liveLogoEl.src = session.company.logoUrl || "./src/img/logos/easy-data-accounting-brand-logo.jpg";
+      }
+      syncCompanyAuthTelemetryToShell();
+    }
+  });
 
   // 7. Montar el módulo inicial (Catálogo de Cuentas)
   await mountAndRenderIndependentModule("chart-of-accounts");

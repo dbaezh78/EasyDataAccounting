@@ -503,11 +503,17 @@ export async function registerFetchedAdOrRadiusUserWithPermissions({
     (u) => u.username.toLowerCase() === cleanUsername.toLowerCase()
   );
 
+  const cleanSam = String(userProfile.samAccount || cleanUsername.replace(/^.*\\/, "")).trim();
+  const cleanEmail = userProfile.email || existing?.email || `${cleanSam}@laantillana.com`;
+  const resolvedLocalPassword = userProfile.localPassword || userProfile.password || existing?.localPassword || "laantillana2026*";
+
   const userRecord = {
     id: existing ? existing.id : `AD-USR-${Date.now()}`,
     username: cleanUsername,
+    samAccount: cleanSam,
     fullName: userProfile.fullName || cleanUsername,
-    email: userProfile.email || `${userProfile.samAccount || "usuario"}@laantillana.local`,
+    email: cleanEmail,
+    localPassword: resolvedLocalPassword,
     organizationalUnit: userProfile.distinguishedName || "OU=Usuarios,dc=laantillana,dc=local",
     adGroup: Array.isArray(userProfile.adGroups) && userProfile.adGroups.length > 0
       ? String(userProfile.adGroups[0]).split(",")[0].replace(/^CN=/i, "")
@@ -530,11 +536,45 @@ export async function registerFetchedAdOrRadiusUserWithPermissions({
     actor: userRecord.username,
     moduleId: "users-windows",
     action: "USER_PULLED_AND_PERMISSIONS_ASSIGNED",
-    detail: `Usuario '${userRecord.username}' traído desde ${userRecord.authProtocol} y configurado para usar los permisos de '${permGroup.name}' (${permGroup.departmentName}).`,
+    detail: `Usuario '${userRecord.username}' (${userRecord.email}) traído desde ${userRecord.authProtocol} con contraseña local de respaldo y configurado para usar los permisos de '${permGroup.name}' (${permGroup.departmentName}).`,
     severity: "SUCCESS"
   });
 
   return userRecord;
+}
+
+/**
+ * Actualiza o restablece la contraseña local y el correo de respaldo de un usuario
+ * para que pueda ingresar desde la web cuando el dominio esté inaccesible o fuera.
+ */
+export async function updateUserLocalCredentials({
+  userId,
+  email,
+  localPassword
+}) {
+  const users = getCollectionRecords("windowsAdUsers");
+  const targetUser = users.find((u) => u.id === userId);
+  if (!targetUser) {
+    return null;
+  }
+
+  const updatedUser = {
+    ...targetUser,
+    email: email ? String(email).trim() : targetUser.email,
+    localPassword: localPassword ? String(localPassword) : targetUser.localPassword
+  };
+
+  await insertOrUpdateCollectionRecord("windowsAdUsers", updatedUser);
+
+  recordSecurityAuditEvent({
+    actor: updatedUser.username,
+    moduleId: "users-windows",
+    action: "USER_LOCAL_CREDENTIALS_UPDATED",
+    detail: `Credenciales locales de respaldo actualizadas para '${updatedUser.username}' (Correo: ${updatedUser.email}).`,
+    severity: "SUCCESS"
+  });
+
+  return updatedUser;
 }
 
 export function countEnabledModulesInGroup(group) {
